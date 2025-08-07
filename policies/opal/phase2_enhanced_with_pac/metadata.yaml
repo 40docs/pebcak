@@ -1,0 +1,9 @@
+category: Network Security
+severity: High
+title: "Phase 2: Enhanced PAC - Organizational Custom Rules"
+description: "Beyond traditional IaC - adds YOUR organization's specific security requirements. Traditional tools check SSH/RDP/databases, but your custom policies also check application-specific ports like 8080 that are unique to your environment."
+guidelines:
+  violation: "Security group violates organizational security standards including custom application ports"
+  rationale: "Organizations have custom applications running on non-standard ports that need the same protection as traditional services. Generic IaC tools miss these organization-specific requirements like port 8080 for your custom applications."
+  audit: "Review security group rules for both standard ports AND your organization's custom application ports (especially 8080)"
+  remediation: "Restrict access to approved IP ranges for all sensitive ports including organization-specific application ports"

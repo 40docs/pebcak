@@ -1,0 +1,9 @@
+category: Network Security
+severity: Critical
+title: "Phase 3: Environment & Business-Aware Rules"
+description: "Sophisticated policies that understand both environment context (dev/prod) and business function. Same infrastructure configuration may pass or fail based on deployment environment and business purpose."
+guidelines:
+  violation: "Security group configuration violates environment-specific or business function requirements"
+  rationale: "Production systems require stricter controls than development. Customer-facing applications need different protection than internal tools. Business context determines appropriate security controls."
+  audit: "Review security group rules considering both deployment environment and business function"
+  remediation: "Apply environment-appropriate and business-function-appropriate security controls"
