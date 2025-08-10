@@ -11,11 +11,11 @@ Learn how Policy as Code transforms infrastructure validation from basic best pr
 
 ### Three Progressive Phases
 
-**Phase 1**: Basic IaC Scanning - Traditional security group and encryption checks
+**Phase 1**: Traditional IaC Scanning - Basic security group validation (SSH, RDP, database ports)
 
-**Phase 2**: Enhanced PAC - Current sample policy validating specific resource configurations
+**Phase 2**: Enhanced PAC with Organizational Rules - Validates custom application ports specific to your organization
 
-**Phase 3**: Enterprise RDS Controls - Production-ready policies validating environment-specific RDS requirements with granular control
+**Phase 3**: Environment & Business-Aware Policies - Context-sensitive validation based on environment tags and business function
 
 Each phase includes:
 
@@ -135,7 +135,7 @@ This lab demonstrates the evolution of Policy as Code through three progressive 
 
 **Scenario**: Your organization needs basic security validation - ensuring security groups don't allow unrestricted access and EC2 instances have encryption enabled.
 
-**Location**: `policies/opal/phase1_basic_security/`
+**Location**: `policies/opal/phase1_traditional_iac/`
 
 **What you'll learn**:
 - Simple allow/deny policies
@@ -144,14 +144,14 @@ This lab demonstrates the evolution of Policy as Code through three progressive 
 
 **Run the test**:
 ```bash
-lacework iac policy test -d opal/phase1_basic_security
+lacework iac policy test -d policies/opal/phase1_traditional_iac
 ```
 
 ### Phase 2: Enhanced PAC (Current Sample)
 
-**Scenario**: Your compliance team requires S3 buckets to log to specific, approved logging buckets for audit purposes.
+**Scenario**: Your organization has custom applications running on non-standard ports (like 8080) that traditional IaC tools miss, but your security team needs to protect.
 
-**Location**: `policies/opal/phase2_enhanced_pac/`
+**Location**: `policies/opal/phase2_enhanced_with_pac/`
 
 **What you'll learn**:
 - Validating specific configuration values
@@ -160,27 +160,29 @@ lacework iac policy test -d opal/phase1_basic_security
 
 **Run the test**:
 ```bash
-lacework iac policy test -d opal/phase2_enhanced_pac
+lacework iac policy test -d policies/opal/phase2_enhanced_with_pac
 ```
 
 ### Phase 3: Advanced PAC - Production Environment
 
-**Scenario**: Your enterprise environment requires granular control over infrastructure deployments:
-- RDS instances must use approved parameter groups by environment
-- Application Load Balancers must use specific SSL policies based on compliance requirements
-- Lambda functions must have specific tags and environment variables for cost allocation and monitoring
+**Scenario**: Your enterprise environment requires context-sensitive security controls:
+- Production custom application ports must only accept traffic from corporate CIDR ranges
+- Development environments have relaxed rules but still block critical infrastructure ports
+- Customer-facing applications in production require monitoring tags
+- Same security group configuration may pass in dev but fail in production
 
-**Location**: `policies/opal/phase3_enterprise_controls/`
+**Location**: `policies/opal/phase3_environment_business_aware/`
 
 **What you'll learn**:
-- Complex policy logic with multiple resource types
-- Environment-specific validation rules
-- Integration with enterprise standards and tagging strategies
-- Custom error messages for actionable feedback
+- Environment-aware policy logic (production vs development rules)
+- Business function context (customer-facing vs internal)
+- Corporate CIDR enforcement for production environments
+- Tag-based monitoring requirements
+- Same infrastructure may pass/fail based on context
 
 **Run the test**:
 ```bash
-lacework iac policy test -d opal/phase3_enterprise_controls
+lacework iac policy test -d policies/opal/phase3_environment_business_aware
 ```
 
 ---
@@ -190,8 +192,8 @@ lacework iac policy test -d opal/phase3_enterprise_controls
 ### 1. Clone this repo
 
 ```bash
-git clone https://github.com/your-org/lab-forticnapp-opal.git
-cd lab-forticnapp-opal/policies
+# This is part of the 40docs platform
+cd policies
 ```
 
 ### 2. Run Tests with Actionable Output
@@ -199,26 +201,30 @@ cd lab-forticnapp-opal/policies
 Run each phase and extract only valuable information:
 
 ```bash
-# Quick demo with all phases
-./demo_lab.sh
+# Test all phases sequentially
+for phase in phase1_traditional_iac phase2_enhanced_with_pac phase3_environment_business_aware; do
+  echo "\n=== Testing $phase ==="
+  lacework iac policy test -d policies/opal/$phase
+done
 
-# Phase 3 (Advanced PAC) - Extract only violation messages
-lacework iac policy test -d policies/opal/phase3_advanced_pac --json 2>/dev/null | \
+# Phase 3 (Environment & Business-Aware) - Extract only violation messages
+lacework iac policy test -d policies/opal/phase3_environment_business_aware --json 2>/dev/null | \
   jq -r 'if .results then .results[] | select(.violations) | .violations[] else "No test results found" end // "No violations"'
 
 # Get pass/fail summary
-lacework iac policy test -d policies/opal/phase3_advanced_pac --json 2>/dev/null | \
+lacework iac policy test -d policies/opal/phase3_environment_business_aware --json 2>/dev/null | \
   jq -r 'if .summary then "✅ Passed: " + (.summary.passed // 0 | tostring) + " | ❌ Failed: " + (.summary.failed // 0 | tostring) else "No summary available" end'
 
 # Show failures with resource names (safer version)
-lacework iac policy test -d policies/opal/phase3_advanced_pac --json 2>/dev/null | \
+lacework iac policy test -d policies/opal/phase3_environment_business_aware --json 2>/dev/null | \
   jq -r 'if .results then .results[] | select(.result == "FAIL" and .violations) | "❌ " + (.resource // "unknown") + ": " + (.violations | join("; ")) else "No failures found" end'
 
-# Load convenient aliases
-source opal_aliases.sh
-opal-violations  # Just violations
-opal-summary     # Pass/fail counts
-opal-check       # CI/CD style (exit codes)
+# Run all phases with summary
+for phase in phase1_traditional_iac phase2_enhanced_with_pac phase3_environment_business_aware; do
+  echo "\n=== $phase Summary ==="
+  lacework iac policy test -d policies/opal/$phase --json 2>/dev/null | \
+    jq -r 'if .summary then "✅ Passed: " + (.summary.passed // 0 | tostring) + " | ❌ Failed: " + (.summary.failed // 0 | tostring) else "No summary available" end'
+done
 ```
 
 ### 3. Quick Testing Commands
@@ -227,10 +233,10 @@ For daily use, these one-liners extract only what you need:
 
 ```bash
 # Just show me the problems
-lacework iac policy test -d policies/opal/phase3_rds_controls --json 2>/dev/null | jq -r '.results[]?.violations[]?'
+lacework iac policy test -d policies/opal/phase3_environment_business_aware --json 2>/dev/null | jq -r '.results[]?.violations[]?'
 
 # CI/CD pipeline check (exit code matters)
-lacework iac policy test -d policies/opal/phase3_rds_controls --json 2>/dev/null | jq -e '.summary.failed == 0'
+lacework iac policy test -d policies/opal/phase3_environment_business_aware --json 2>/dev/null | jq -e '.summary.failed == 0'
 ```
 
 ### 3. Test Against Production-Like Infrastructure
@@ -264,28 +270,28 @@ lacework iac tf-scan opal --disable-custom-policies=false -d /path/to/your/proje
 - Limited to basic security hygiene and best practices
 
 **Phase 2 Insights:**
-- Moves beyond binary checks to validate specific configuration values
-- Introduces organizational compliance requirements
-- Demonstrates how PAC can enforce business-specific rules
-- Shows the bridge between generic security and organizational standards
+- Organizational-specific ports (8080, 9000, 8443) need the same protection as traditional ports
+- Custom policies extend beyond what generic IaC tools provide
+- Business-specific requirements can't be addressed by one-size-fits-all solutions
+- Shows evolution from generic to organization-specific security rules
 
 **Phase 3 Insights:**
-- Enterprise environments require granular, multi-resource validation
-- Environment-specific rules ensure appropriate security posture across SDLC
-- Comprehensive tagging strategies enable cost allocation and compliance tracking
-- Custom error messages provide actionable feedback for developers
-- Advanced policies can validate complex business logic and organizational standards
+- Same infrastructure configuration may pass/fail based on environment context
+- Production environments require stricter controls than development
+- Business function tags (customer-facing vs internal) affect security requirements
+- Corporate CIDR enforcement ensures production traffic comes from approved networks
+- Context-aware policies enable appropriate security posture across SDLC stages
 
 ### Real-World Applications
 
 **Financial Services Example:**
-A bank might use Phase 3 policies to ensure all RDS instances in production use specific parameter groups that meet SOX compliance requirements, while development environments can use more flexible configurations.
+A bank might allow custom application ports (8080) in development for testing, but require production applications to only accept traffic from corporate networks (203.0.113.0/24) to prevent unauthorized access to sensitive financial systems.
 
 **Healthcare Organization Example:**
-A healthcare provider could implement policies that require specific SSL policies for ALBs handling PHI (Protected Health Information) and ensure Lambda functions processing patient data have appropriate monitoring and logging configurations.
+A healthcare provider could permit relaxed security group rules in development environments, but enforce that production systems handling PHI only accept connections from approved corporate CIDR ranges and have proper monitoring tags.
 
 **E-commerce Platform Example:**
-An online retailer might enforce that all production databases have 30-day backup retention for disaster recovery, while requiring specific tagging for cost allocation across different business units.
+An online retailer might allow open access to custom application ports in development for rapid prototyping, but require production customer-facing applications to restrict access to corporate networks and include business function tags for compliance tracking.
 
 ---
 
@@ -294,17 +300,20 @@ An online retailer might enforce that all production databases have 30-day backu
 ### Adding Your Own Policies
 
 1. Create a new directory under `policies/opal/your_policy_name/`
-2. Add `metadata.yaml` with required properties
-3. Create `terraform/policy.rego` with your policy logic
-4. Add test cases in `terraform/tests/pass/` and `terraform/tests/fail/`
+2. Add `metadata.yaml` with required properties (category, severity, title, description)
+3. Create `terraform/policy.rego` with your OPAL policy logic
+4. Add test cases in `terraform/tests/pass/main.tf` and `terraform/tests/fail/main.tf`
+5. Include realistic Terraform configurations that mirror production scenarios
 
 ### Best Practices for Policy Development
 
-1. **Start Simple**: Begin with basic allow/deny logic before adding complexity
-2. **Provide Clear Messages**: Use `iac.deny_resource_with_message()` for actionable feedback
-3. **Test Thoroughly**: Create comprehensive pass/fail test cases
-4. **Environment Awareness**: Consider different requirements for dev/staging/production
-5. **Document Intent**: Clear comments in your Rego code help with maintenance
+1. **Start Simple**: Begin with basic allow/deny logic (Phase 1 approach)
+2. **Add Organizational Context**: Include business-specific requirements (Phase 2 approach)
+3. **Consider Environment**: Implement context-sensitive rules (Phase 3 approach)
+4. **Test Thoroughly**: Create comprehensive pass/fail test cases for all scenarios
+5. **Document Intent**: Clear comments explaining business logic and security rationale
+6. **Use Meaningful Names**: Function names should reflect business context (`has_environment_business_violation`)
+7. **Tag-Based Logic**: Leverage resource tags for environment and business function awareness
 
 ---
 
